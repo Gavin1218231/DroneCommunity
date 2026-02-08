@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, Share2, MapPin, Tag, Image, Video, FileText } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Tag, Image as ImageIcon, Video, FileText } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import CommentSection from './CommentSection';
@@ -55,7 +55,7 @@ export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpd
 
   const getPostTypeIcon = () => {
     switch (post.post_type) {
-      case 'photo': return <Image className="w-3.5 h-3.5" />;
+      case 'photo': return <ImageIcon className="w-3.5 h-3.5" />;
       case 'video': return <Video className="w-3.5 h-3.5" />;
       default: return <FileText className="w-3.5 h-3.5" />;
     }
@@ -126,6 +126,7 @@ export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpd
             {post.media_type === 'video' ? (
               <video src={post.media_url} controls className="w-full max-h-96 object-cover" />
             ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img src={post.media_url} alt="Post media" className="w-full max-h-96 object-cover" />
             )}
           </div>

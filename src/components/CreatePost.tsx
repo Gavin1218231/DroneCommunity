@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Send, Image, Video, FileText, X } from 'lucide-react';
+import { Send, Image as ImageIcon, Video, FileText } from 'lucide-react';
 
 interface CreatePostProps {
   onPostCreated: () => void;
@@ -56,7 +56,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
   const postTypes = [
     { value: 'general', label: 'Post', icon: FileText },
-    { value: 'photo', label: 'Photo', icon: Image },
+    { value: 'photo', label: 'Photo', icon: ImageIcon },
     { value: 'video', label: 'Video', icon: Video },
   ];
 
@@ -118,7 +118,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         <div className="px-4 py-3 border-t border-gray-700/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button type="button" className="p-2 text-gray-400 hover:text-cyan-400 hover:bg-gray-700/50 rounded-lg transition-all">
-              <Image className="w-5 h-5" />
+              <ImageIcon className="w-5 h-5" />
             </button>
             <button type="button" className="p-2 text-gray-400 hover:text-cyan-400 hover:bg-gray-700/50 rounded-lg transition-all">
               <Video className="w-5 h-5" />

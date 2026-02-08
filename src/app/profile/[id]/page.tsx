@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import PostCard from '@/components/PostCard';
@@ -49,12 +49,7 @@ export default function ProfilePage() {
 
   const userId = params.id as string;
 
-  useEffect(() => {
-    fetchProfile();
-    fetchPosts();
-  }, [userId]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const res = await fetch(`/api/users/${userId}`);
       const data = await res.json();
@@ -64,9 +59,9 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       // First get user info to get their ID
       const userRes = await fetch(`/api/users/${userId}`);
@@ -79,7 +74,12 @@ export default function ProfilePage() {
     } catch (err) {
       console.error('Failed to load posts:', err);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    fetchProfile();
+    fetchPosts();
+  }, [fetchProfile, fetchPosts]);
 
   const startConversation = async () => {
     if (!profile || !currentUser) return;
