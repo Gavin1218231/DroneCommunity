@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, Share2, Tag, Image as ImageIcon, Video, FileText } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Heart, MessageCircle, Share2, Tag, Image as ImageIcon, Video, FileText, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import CommentSection from './CommentSection';
@@ -24,13 +25,18 @@ interface Post {
   liked_by_me?: number;
 }
 
-export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpdate?: () => void }) {
+export default function PostCard({ post, onLikeUpdate, onPostDeleted }: { post: Post; onLikeUpdate?: () => void; onPostDeleted?: () => void }) {
   const { user } = useAuth();
+  const router = useRouter();
   const [showComments, setShowComments] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes_count);
   const [liked, setLiked] = useState(!!post.liked_by_me);
   const [commentsCount, setCommentsCount] = useState(post.comments_count);
   const [isLiking, setIsLiking] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const isOwner = user?.id === post.user_id;
 
   const handleLike = async () => {
     if (!user || isLiking) return;
@@ -50,6 +56,31 @@ export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpd
       console.error('Like failed:', err);
     } finally {
       setIsLiking(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        onPostDeleted?.();
+      }
+    } catch (err) {
+      console.error('Delete failed:', err);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/profile/${post.username}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Fallback - silently fail
     }
   };
 
@@ -103,7 +134,7 @@ export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpd
               <Link href={`/profile/${post.username}`} className="text-gray-500 text-sm">
                 @{post.username}
               </Link>
-              <span className="text-gray-600">·</span>
+              <span className="text-gray-600">&middot;</span>
               <span className="text-gray-500 text-sm">{timeAgo}</span>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
@@ -113,6 +144,35 @@ export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpd
               </span>
             </div>
           </div>
+          {isOwner && (
+            <div className="relative">
+              {showDeleteConfirm ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="px-2 py-1 text-xs bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Confirm'}
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="px-2 py-1 text-xs text-gray-400 hover:text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-gray-700/50 rounded-lg transition-all"
+                  title="Delete post"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -136,13 +196,14 @@ export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpd
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
             {tags.map((tag) => (
-              <span
+              <button
                 key={tag}
+                onClick={() => router.push(`/explore?tag=${encodeURIComponent(tag.trim())}`)}
                 className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors cursor-pointer"
               >
                 <Tag className="w-3 h-3" />
                 {tag.trim()}
-              </span>
+              </button>
             ))}
           </div>
         )}
@@ -171,7 +232,10 @@ export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpd
           <span>{commentsCount}</span>
         </button>
 
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-green-400 hover:bg-gray-700/50 transition-all">
+        <button
+          onClick={handleShare}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-green-400 hover:bg-gray-700/50 transition-all"
+        >
           <Share2 className="w-4 h-4" />
           <span>Share</span>
         </button>
@@ -182,6 +246,7 @@ export default function PostCard({ post, onLikeUpdate }: { post: Post; onLikeUpd
         <CommentSection
           postId={post.id}
           onNewComment={() => setCommentsCount((c) => c + 1)}
+          onCommentDeleted={() => setCommentsCount((c) => Math.max(0, c - 1))}
         />
       )}
     </div>

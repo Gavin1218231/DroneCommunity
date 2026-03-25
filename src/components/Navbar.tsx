@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Compass, MessageCircle, User, LogOut, Menu, X, Bot, Home } from 'lucide-react';
+import { Compass, MessageCircle, User, LogOut, Menu, X, Bot, Home, Search } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -30,6 +30,10 @@ export default function Navbar() {
                 <Link href="/" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
                   <Home className="w-4 h-4" />
                   <span>Feed</span>
+                </Link>
+                <Link href="/explore" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
+                  <Search className="w-4 h-4" />
+                  <span>Explore</span>
                 </Link>
                 <Link href="/messages" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
                   <MessageCircle className="w-4 h-4" />
@@ -79,6 +83,9 @@ export default function Navbar() {
               <>
                 <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg">
                   <Home className="w-5 h-5" /> Feed
+                </Link>
+                <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg">
+                  <Search className="w-5 h-5" /> Explore
                 </Link>
                 <Link href="/messages" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg">
                   <MessageCircle className="w-5 h-5" /> Messages

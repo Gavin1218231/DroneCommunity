@@ -56,3 +56,91 @@ export async function GET(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// Follow/unfollow toggle
+export async function POST(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const db = getDb();
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const targetUser = db.prepare(
+      'SELECT id FROM users WHERE id = ? OR username = ?'
+    ).get(id, id) as { id: string } | undefined;
+
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (targetUser.id === currentUserId) {
+      return NextResponse.json({ error: 'Cannot follow yourself' }, { status: 400 });
+    }
+
+    const existing = db.prepare(
+      'SELECT * FROM follows WHERE follower_id = ? AND following_id = ?'
+    ).get(currentUserId, targetUser.id);
+
+    if (existing) {
+      db.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(currentUserId, targetUser.id);
+      return NextResponse.json({ following: false });
+    } else {
+      db.prepare('INSERT INTO follows (follower_id, following_id) VALUES (?, ?)').run(currentUserId, targetUser.id);
+      return NextResponse.json({ following: true });
+    }
+  } catch (error) {
+    console.error('Follow error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// Update own profile
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const db = getDb();
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const targetUser = db.prepare(
+      'SELECT id FROM users WHERE id = ? OR username = ?'
+    ).get(id, id) as { id: string } | undefined;
+
+    if (!targetUser || targetUser.id !== currentUserId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { display_name, bio, drone_setup, location } = await request.json();
+
+    db.prepare(
+      'UPDATE users SET display_name = ?, bio = ?, drone_setup = ?, location = ? WHERE id = ?'
+    ).run(
+      display_name ?? '',
+      bio ?? '',
+      drone_setup ?? '',
+      location ?? '',
+      currentUserId
+    );
+
+    const updated = db.prepare(
+      'SELECT id, username, display_name, bio, avatar_url, drone_setup, location, created_at FROM users WHERE id = ?'
+    ).get(currentUserId) as UserRow;
+
+    return NextResponse.json({ user: updated });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

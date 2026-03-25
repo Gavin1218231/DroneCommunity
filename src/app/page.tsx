@@ -188,7 +188,7 @@ export default function HomePage() {
       ) : (
         <div className="space-y-4">
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} onLikeUpdate={fetchPosts} />
+            <PostCard key={post.id} post={post} onLikeUpdate={fetchPosts} onPostDeleted={fetchPosts} />
           ))}
         </div>
       )}

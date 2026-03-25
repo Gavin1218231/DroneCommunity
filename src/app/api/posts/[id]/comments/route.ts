@@ -66,3 +66,42 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const db = getDb();
+
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id: postId } = await params;
+    const { searchParams } = new URL(request.url);
+    const commentId = searchParams.get('comment_id');
+
+    if (!commentId) {
+      return NextResponse.json({ error: 'comment_id is required' }, { status: 400 });
+    }
+
+    const comment = db.prepare('SELECT user_id FROM comments WHERE id = ? AND post_id = ?').get(commentId, postId) as { user_id: string } | undefined;
+    if (!comment) {
+      return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+    }
+
+    if (comment.user_id !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    db.prepare('DELETE FROM comments WHERE id = ?').run(commentId);
+    db.prepare('UPDATE posts SET comments_count = MAX(0, comments_count - 1) WHERE id = ?').run(postId);
+
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    console.error('Delete comment error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

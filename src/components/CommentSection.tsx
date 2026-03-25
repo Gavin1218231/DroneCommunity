@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Send } from 'lucide-react';
+import { Send, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -17,12 +17,13 @@ interface Comment {
   avatar_url: string;
 }
 
-export default function CommentSection({ postId, onNewComment }: { postId: string; onNewComment: () => void }) {
+export default function CommentSection({ postId, onNewComment, onCommentDeleted }: { postId: string; onNewComment: () => void; onCommentDeleted?: () => void }) {
   const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchComments = useCallback(async () => {
     try {
@@ -64,6 +65,24 @@ export default function CommentSection({ postId, onNewComment }: { postId: strin
     }
   };
 
+  const handleDelete = async (commentId: string) => {
+    if (deletingId) return;
+    setDeletingId(commentId);
+    try {
+      const res = await fetch(`/api/posts/${postId}/comments?comment_id=${commentId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+        onCommentDeleted?.();
+      }
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="border-t border-gray-700/50 bg-gray-900/30">
       {/* Comments list */}
@@ -76,6 +95,7 @@ export default function CommentSection({ postId, onNewComment }: { postId: strin
           <div className="divide-y divide-gray-700/30">
             {comments.map((comment) => {
               const initials = comment.display_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+              const isOwner = user?.id === comment.user_id;
               let timeAgo: string;
               try {
                 timeAgo = formatDistanceToNow(new Date(comment.created_at + 'Z'), { addSuffix: true });
@@ -84,7 +104,7 @@ export default function CommentSection({ postId, onNewComment }: { postId: strin
               }
 
               return (
-                <div key={comment.id} className="px-4 py-3 flex gap-3">
+                <div key={comment.id} className="px-4 py-3 flex gap-3 group">
                   <Link href={`/profile/${comment.username}`}>
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
                       {initials}
@@ -96,6 +116,16 @@ export default function CommentSection({ postId, onNewComment }: { postId: strin
                         {comment.display_name}
                       </Link>
                       <span className="text-gray-500 text-xs">{timeAgo}</span>
+                      {isOwner && (
+                        <button
+                          onClick={() => handleDelete(comment.id)}
+                          disabled={deletingId === comment.id}
+                          className="ml-auto opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-400 rounded transition-all disabled:opacity-50"
+                          title="Delete comment"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     <p className="text-gray-300 text-sm mt-0.5">{comment.content}</p>
                   </div>

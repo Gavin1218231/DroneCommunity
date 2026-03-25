@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import PostCard from '@/components/PostCard';
-import { MapPin, Calendar, Wrench, MessageCircle, UserPlus, UserCheck } from 'lucide-react';
+import { MapPin, Calendar, Wrench, MessageCircle, UserPlus, UserCheck, Pencil, X, Save } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface UserProfile {
@@ -42,10 +42,19 @@ interface Post {
 export default function ProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    display_name: '',
+    bio: '',
+    drone_setup: '',
+    location: '',
+  });
+  const [saving, setSaving] = useState(false);
 
   const userId = params.id as string;
 
@@ -54,6 +63,14 @@ export default function ProfilePage() {
       const res = await fetch(`/api/users/${userId}`);
       const data = await res.json();
       setProfile(data.user);
+      if (data.user) {
+        setEditForm({
+          display_name: data.user.display_name,
+          bio: data.user.bio || '',
+          drone_setup: data.user.drone_setup || '',
+          location: data.user.location || '',
+        });
+      }
     } catch (err) {
       console.error('Failed to load profile:', err);
     } finally {
@@ -63,7 +80,6 @@ export default function ProfilePage() {
 
   const fetchPosts = useCallback(async () => {
     try {
-      // First get user info to get their ID
       const userRes = await fetch(`/api/users/${userId}`);
       const userData = await userRes.json();
       if (userData.user) {
@@ -81,6 +97,28 @@ export default function ProfilePage() {
     fetchPosts();
   }, [fetchProfile, fetchPosts]);
 
+  const handleFollow = async () => {
+    if (!profile || !currentUser || followLoading) return;
+    setFollowLoading(true);
+    try {
+      const res = await fetch(`/api/users/${profile.id}`, { method: 'POST' });
+      const data = await res.json();
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              is_following: data.following,
+              follower_count: prev.follower_count + (data.following ? 1 : -1),
+            }
+          : prev
+      );
+    } catch (err) {
+      console.error('Follow failed:', err);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const startConversation = async () => {
     if (!profile || !currentUser) return;
     try {
@@ -96,6 +134,33 @@ export default function ProfilePage() {
     } catch (err) {
       console.error('Failed to start conversation:', err);
     }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!profile || saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/users/${profile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+      const data = await res.json();
+      if (data.user) {
+        setProfile((prev) => (prev ? { ...prev, ...data.user } : prev));
+        setEditing(false);
+        refreshUser();
+      }
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePostDeleted = () => {
+    fetchPosts();
+    fetchProfile();
   };
 
   if (loading) {
@@ -152,7 +217,15 @@ export default function ProfilePage() {
                   <MessageCircle className="w-4 h-4" />
                   Message
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl hover:from-cyan-400 hover:to-blue-500 transition-all shadow-lg shadow-cyan-500/20">
+                <button
+                  onClick={handleFollow}
+                  disabled={followLoading}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all shadow-lg disabled:opacity-50 ${
+                    profile.is_following
+                      ? 'bg-gray-700/50 border border-gray-600/50 text-white hover:bg-red-500/20 hover:border-red-500/30 hover:text-red-400'
+                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 shadow-cyan-500/20'
+                  }`}
+                >
                   {profile.is_following ? (
                     <>
                       <UserCheck className="w-4 h-4" />
@@ -167,32 +240,102 @@ export default function ProfilePage() {
                 </button>
               </div>
             )}
+            {isOwnProfile && !editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-700/50 border border-gray-600/50 text-white rounded-xl hover:bg-gray-700 transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Edit Profile
+              </button>
+            )}
           </div>
 
-          {/* Bio */}
-          {profile.bio && (
-            <p className="text-gray-300 mt-4 leading-relaxed">{profile.bio}</p>
+          {/* Edit form */}
+          {editing && isOwnProfile ? (
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Display Name</label>
+                <input
+                  type="text"
+                  value={editForm.display_name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, display_name: e.target.value }))}
+                  className="w-full bg-gray-900/50 border border-gray-600/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Bio</label>
+                <textarea
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm((f) => ({ ...f, bio: e.target.value }))}
+                  rows={3}
+                  className="w-full bg-gray-900/50 border border-gray-600/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500/50 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Drone Setup</label>
+                <input
+                  type="text"
+                  value={editForm.drone_setup}
+                  onChange={(e) => setEditForm((f) => ({ ...f, drone_setup: e.target.value }))}
+                  className="w-full bg-gray-900/50 border border-gray-600/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Location</label>
+                <input
+                  type="text"
+                  value={editForm.location}
+                  onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
+                  className="w-full bg-gray-900/50 border border-gray-600/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setEditing(false)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={saving || !editForm.display_name.trim()}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:from-cyan-400 hover:to-blue-500 transition-all disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Bio */}
+              {profile.bio && (
+                <p className="text-gray-300 mt-4 leading-relaxed">{profile.bio}</p>
+              )}
+
+              {/* Info badges */}
+              <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-gray-400">
+                {profile.location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-cyan-400" />
+                    {profile.location}
+                  </span>
+                )}
+                {profile.drone_setup && (
+                  <span className="flex items-center gap-1.5">
+                    <Wrench className="w-4 h-4 text-blue-400" />
+                    {profile.drone_setup}
+                  </span>
+                )}
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-purple-400" />
+                  Joined {memberSince}
+                </span>
+              </div>
+            </>
           )}
-
-          {/* Info badges */}
-          <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-gray-400">
-            {profile.location && (
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-cyan-400" />
-                {profile.location}
-              </span>
-            )}
-            {profile.drone_setup && (
-              <span className="flex items-center gap-1.5">
-                <Wrench className="w-4 h-4 text-blue-400" />
-                {profile.drone_setup}
-              </span>
-            )}
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-purple-400" />
-              Joined {memberSince}
-            </span>
-          </div>
 
           {/* Stats */}
           <div className="flex items-center gap-6 mt-5 pt-5 border-t border-gray-700/50">
@@ -221,7 +364,7 @@ export default function ProfilePage() {
           </div>
         ) : (
           posts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <PostCard key={post.id} post={post} onPostDeleted={handlePostDeleted} />
           ))
         )}
       </div>
