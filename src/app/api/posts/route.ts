@@ -76,6 +76,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 });
     }
 
+    // Only allow http(s) media URLs. This blocks javascript:, data:, and other
+    // schemes from being persisted and later rendered into <img>/<video src>.
+    if (media_url) {
+      let parsed: URL;
+      try {
+        parsed = new URL(media_url);
+      } catch {
+        return NextResponse.json({ error: 'Invalid media URL' }, { status: 400 });
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return NextResponse.json({ error: 'Media URL must use http or https' }, { status: 400 });
+      }
+    }
+
     const id = uuidv4();
     db.prepare(
       'INSERT INTO posts (id, user_id, content, media_url, media_type, post_type, tags) VALUES (?, ?, ?, ?, ?, ?, ?)'

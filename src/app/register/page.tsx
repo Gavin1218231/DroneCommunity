@@ -110,9 +110,9 @@ export default function RegisterPage() {
                   type="password"
                   value={formData.password}
                   onChange={(e) => updateField('password', e.target.value)}
-                  placeholder="Create a password (min 6 characters)"
+                  placeholder="Create a password (min 8 characters)"
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full bg-gray-900/50 border border-gray-600/50 rounded-xl pl-11 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
                 />
               </div>
